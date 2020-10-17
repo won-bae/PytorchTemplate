@@ -4,16 +4,16 @@ This is a template for a deep learning project based on pytorch.
 
 
 ## Requirements
-To fulfill the basic requirements,
+To fulfill the basic requirements, run the command below.
 ```bash
 pip install -r requirements.txt
 ```
 
 ## Configs
-Configurations are written in the form of yaml. Please refer to the configs/default.yml for the details about how to structure configs.
+Configs are written in the form of yaml. Please refer to the configs/default.yml for the details about how to structure configs.
 
 ## Datasets
-It assumes datasets are located in data root which can be modified in data section of a config file.
+It assumes datasets are located in data root which can be modified in the data section of a config file.
 
 ## Train
 To train a model, refer to the command below. Note that train_root/tag is defined as train_dir where all the checkpoints and logs are saved.
