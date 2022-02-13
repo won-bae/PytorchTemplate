@@ -26,3 +26,12 @@ To evaluate a model, refer to the command below. Note that train_dir should be s
 ```bash
 bash scripts/run_eval.sh --config_path configs/default.yml --train_dir path/to/dir --tag vgg16_test
 ```
+## Citation
+If you use this code, please cite:
+
+    @Misc{bae2019pytorchtemplate,
+      author = {Wonho Bae},
+      title = {Pytorch Template},
+      year = {2019},
+      howpublished = "\url{https://github.com/won-bae/PytorchTemplate/}"
+    }
