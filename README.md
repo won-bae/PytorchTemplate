@@ -16,15 +16,15 @@ Configs are written in the form of yaml. Please refer to the configs/default.yml
 It assumes datasets are located in data root which can be modified in the data section of a config file.
 
 ## Train
-To train a model, refer to the command below. Note that train_root/tag is defined as train_dir where all the checkpoints and logs are saved.
+To train a model, refer to the command below. Note that save_dir is the directory where all the checkpoints and logs are saved.
 ```bash
-bash scripts/run_train.sh --config_path configs/default.yml --train_root path/to/root --tag vgg16
+bash scripts/run.sh --config_path configs/default.yml --save_dir path/to/root
 ```
 
 ## Eval
-To evaluate a model, refer to the command below. Note that train_dir should be syncronized with train_root/tag used for training.
+To evaluate a model, refer to the command below. Note that save_dir should be syncronized with save_dir used for training.
 ```bash
-bash scripts/run_eval.sh --config_path configs/default.yml --train_dir path/to/dir --tag vgg16_test
+bash scripts/run.sh --config_path configs/default.yml --save_dir path/to/dir --eval_only
 ```
 ## Citation
 If you use this code, please cite:
