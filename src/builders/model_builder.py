@@ -1,17 +1,18 @@
-from src.core.models import vgg
+from src.core.models import resnet
 
 MODELS = {
-    'vgg16': vgg.vgg16,
+    'resnet18': resnet.resnet18,
 }
 
 def build(model_config, logger):
     backbone = model_config['backbone']
-    model_params = model_config.copy()
-    model_params['logger'] = logger
+    model_params = {
+        'pretrained': model_config['pretrained']
+    }
 
     # Build a model
     if backbone in MODELS:
-        model = MODELS[backbone](model_params)
+        model = MODELS[backbone](**model_params)
     else:
         logger.error(
             'Specify valid backbone or model type among {}.'.format(MODELS.keys())

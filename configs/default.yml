@@ -1,8 +1,7 @@
 model: &model
-  num_classes: 200
-  backbone: resnet50
+  num_classes: 10
+  backbone: resnet18
   pretrained: true
-  avgpool_threshold: 0.0
   checkpoint_path: ''
 
 train: &train
@@ -10,7 +9,7 @@ train: &train
 
   optimizer: &optimizer
     name: sgd
-    lr: 0.005
+    lr: 0.01
     momentum: 0.9
     nesterov: False
     weight_decay: 0.001
@@ -24,11 +23,11 @@ eval: &eval
   standard: accuracy
 
 data: &data
-  name: ''
+  name: 'cifar10'
   root: 'data'
-  batch_size: 32
+  batch_size: 128
   num_workers: 4
 
   transform: &transform
-    image_size: 256
-    crop_size: 224
+    image_size: 32
+    crop_size: 28

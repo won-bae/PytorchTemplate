@@ -51,7 +51,7 @@ class CustomCriterion(_Loss):
         self.criterion = CrossEntropyLoss()
 
     def forward(self, output_dict):
-        preds = output_dict['preds']
+        preds = output_dict['logits']
         labels = output_dict['labels']
         losses = self.criterion(preds=preds, labels=labels)
 

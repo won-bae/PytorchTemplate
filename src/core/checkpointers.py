@@ -1,13 +1,13 @@
 import os
 import time
 import torch
+from collections import OrderedDict
 
 
 class CustomCheckpointer(object):
-    def __init__(self, mode, checkpoint_dir, logger, model,
-                 optimizer=None, scheduler=None, eval_standard='accuracy'):
+    def __init__(self, checkpoint_dir, logger, model,
+                 optimizer, scheduler, eval_standard='accuracy'):
         self.logger = logger
-        self.mode = mode
         self.checkpoint_dir = checkpoint_dir
         os.makedirs(self.checkpoint_dir, exist_ok=True)
 
@@ -15,56 +15,58 @@ class CustomCheckpointer(object):
         self.optimizer = optimizer
         self.scheduler = scheduler
 
-        if mode == 'train':
-            self.logger.infov(
-                'Directory {} to save checkpoints is ready.'.format(self.checkpoint_dir))
-        else:
-            self.eval_standard = eval_standard
-            self.best_eval_metric = 0
-
+        self.eval_standard = eval_standard
+        self.reset()
         self.logger.infov('Checkpointer is built.')
 
+    def reset(self):
+        self.best_eval_metric = 0.
+        self.last_eval_metric = 0.
 
-    def save(self, epoch, num_steps, eval_metrics=None, eval_dir=None):
-        # Save the given checkpoint in train time and best checkpoint in eval time.
-        if self.mode == 'train':
-            checkpoint_path = os.path.join(
-                self.checkpoint_dir, 'checkpoint' + '_' + str(epoch) + '_' + str(num_steps) + '.pth')
+    def save(self, epoch, num_steps, eval_metrics=None):
+        model_params = {'epoch': epoch, 'num_steps': num_steps}
+        if torch.cuda.device_count() > 1:
+            model_params['state_dict'] = self.model.module.state_dict()
         else:
+            model_params['state_dict'] = self.model.state_dict()
+
+        model_params['optimizer_state_dict'] = self.optimizer.state_dict()
+
+        # Save the given checkpoint in train time and last/best checkpoints in eval time.
+        if eval_metrics is None:
+            checkpoint_path = os.path.join(
+                self.checkpoint_dir, 'checkpoint' + '_' +  str(epoch) + '_' + str(num_steps) + '.pth')
+            torch.save(model_params, checkpoint_path)
+        else:
+            # Save the last checkpoint
             eval_metric = eval_metrics[self.eval_standard]
+            self.last_eval_metric = eval_metric
+            last_checkpoint_path = os.path.join(self.checkpoint_dir, 'checkpoint_last.pth')
+            torch.save(model_params, last_checkpoint_path)
+
+            # Update the last checkpoint path
+            self._record_last_checkpoint_path()
+
+            # Save the best checkpoint if current eval metric is better than the best one
             if eval_metric <= self.best_eval_metric:
                 return
             self.best_eval_metric = eval_metric
-            checkpoint_path = os.path.join(eval_dir, 'checkpoint_best.pth')
 
-        model_params = {'epoch': epoch, 'num_step': num_steps}
-        if torch.cuda.device_count() > 1:
-            model_params['model_state_dict'] = self.model.module.state_dict()
-        else:
-            model_params['model_state_dict'] = self.model.state_dict()
+            best_checkpoint_path = os.path.join(self.checkpoint_dir, 'checkpoint_best.pth')
+            torch.save(model_params, best_checkpoint_path)
 
-        if self.mode == 'train':
-            model_params['optimizer_state_dict'] = self.optimizer.state_dict()
-            model_params['scheduler_state_dict'] = self.scheduler.state_dict()
-
-        torch.save(model_params, checkpoint_path)
-        self.logger.info(
-            'A checkpoint is saved for epoch={}, steps={}.'.format(epoch, num_steps))
-
-        # Update the checkpoint record
-        if self.mode != 'train':
-            best_checkpoint_info = {'epoch': epoch, 'num_step': num_steps}
+            # Update the checkpoint record
+            best_checkpoint_info = {'epoch': epoch, 'num_steps': num_steps}
             best_checkpoint_info.update(eval_metrics)
+            self._record_best_checkpoint(best_checkpoint_info)
 
-            self._record_best_checkpoint(best_checkpoint_info, eval_dir)
-        else:
-            self._record_last_checkpoint(last_checkpoint_path=checkpoint_path)
+        self.logger.info(
+            'A checkpoint is saved for epoch={}, steps={}.'.format(
+                epoch, num_steps))
 
-
-    def load(self, checkpoint_path=None, use_latest=True):
-        strict = True
-        if self.mode == 'train':
-            if self._has_checkpoint() and use_latest: # Override argument with existing checkpoint
+    def load(self, mode, checkpoint_path=None, use_latest=False):
+        if mode == 'train':
+            if self._has_checkpoint() and use_latest:
                 checkpoint_path = self._get_checkpoint_path()
             if not checkpoint_path:
                 self.logger.info("No checkpoint found. Initializing model from scratch.")
@@ -77,20 +79,19 @@ class CustomCheckpointer(object):
                 checkpoint_path = self._get_checkpoint_path()
 
         self.logger.info("Loading checkpoint from {}".format(checkpoint_path))
-        checkpoint = self._load_checkpoint(checkpoint_path)
+        checkpoint_dict = self._load_checkpoint(checkpoint_path)
 
         self.model.load_state_dict(
-            checkpoint.pop('model_state_dict'), strict=strict)
+            checkpoint_dict.pop('state_dict'), strict=True)
 
-        if strict:
-            if 'optimizer_state_dict' in checkpoint and self.optimizer:
-                self.logger.info("Loading optimizer from {}".format(checkpoint_path))
-                self.optimizer.load_state_dict(checkpoint.pop('optimizer_state_dict'))
-            if 'scheduler_state_dict' in checkpoint and self.scheduler:
-                self.logger.info("Loading scheduler from {}".format(checkpoint_path))
-                self.scheduler.load_state_dict(checkpoint.pop('scheduler_state_dict'))
+        if 'optimizer_state_dict' in checkpoint_dict and self.optimizer:
+            self.logger.info("Loading optimizer from {}".format(checkpoint_path))
+            self.optimizer.load_state_dict(checkpoint_dict.pop('optimizer_state_dict'))
+        if 'scheduler_state_dict' in checkpoint_dict and self.scheduler:
+            self.logger.info("Loading scheduler from {}".format(checkpoint_path))
+            self.scheduler.load_state_dict(checkpoint_dict.pop('scheduler_state_dict'))
 
-        return checkpoint
+        return checkpoint_dict
 
     def _freeze(self):
         for param in self.model.layers.parameters():
@@ -104,7 +105,7 @@ class CustomCheckpointer(object):
         record_path = os.path.join(self.checkpoint_dir, "last_checkpoint")
         try:
             with open(record_path, "r") as f:
-                last_saved = f.read()
+                last_saved = f.readlines()
                 last_saved = last_saved.strip()
         except IOError:
             self.logger.warn('If last_checkpoint file doesn not exist, maybe because \
@@ -112,17 +113,23 @@ class CustomCheckpointer(object):
             last_saved = ''
         return last_saved
 
-    def _record_last_checkpoint(self, last_checkpoint_path):
+    def _record_last_checkpoint_path(self):
         record_path = os.path.join(self.checkpoint_dir, 'last_checkpoint')
         with open(record_path, 'w') as f:
-            f.write(last_checkpoint_path)
+            f.write(str(record_path))
 
-    def _record_best_checkpoint(self, best_checkpoint_info, eval_dir):
-        record_path = os.path.join(eval_dir, 'best_checkpoint')
+    def _record_best_checkpoint(self, best_checkpoint_info):
+        record_path = os.path.join(self.checkpoint_dir, 'best_checkpoint')
         with open(record_path, 'w') as f:
             f.write(str(best_checkpoint_info))
 
+
     def _load_checkpoint(self, checkpoint_path):
-        checkpoint = torch.load(checkpoint_path)
-        checkpoint['checkpoint_path'] = checkpoint_path
-        return checkpoint
+        checkpoint_dict = torch.load(checkpoint_path)
+        if torch.cuda.device_count() > 1:
+            checkpoint = checkpoint_dict['state_dict']
+            checkpoint = OrderedDict([('module.'+ k, v) for k, v in checkpoint.items()])
+            checkpoint_dict['state_dict'] = checkpoint
+
+        checkpoint_dict['checkpoint_path'] = checkpoint_path
+        return checkpoint_dict

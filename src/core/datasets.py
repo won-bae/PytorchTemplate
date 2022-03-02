@@ -1,30 +1,28 @@
+import numpy as np
 from PIL import Image
-from torch.utils.data import Dataset
+from torchvision import datasets
 
 
-class CustomDataset(Dataset):
-    def __init__(self, root, logger, mode, transform=None):
-        self.root = root
-        self.logger = logger
-        self.mode = mode
-        self.transform =transform
-        self.data = self._load_data()
+class CIFAR10(datasets.CIFAR10):
+    def __init__(self, root, mode, download, logger, transform=None):
+        train = True if mode == 'train' else False
+        super(CIFAR10, self).__init__(root, train=train, download=download, transform=transform)
 
-    def _load_data(self):
-        data = []
-        return data
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        sample = self.data[idx]
-        image_path = sample.path
-        label = sample.label
-        image = Image.open(image_path).convert('RGB')
+    def __getitem__(self, index):
+        img, target = self.data[index], self.targets[index]
+        img = Image.fromarray(img)
 
         if self.transform is not None:
-            image = self.transform(image)
+            img = self.transform(img)
 
-        return (image, label)
+        if self.target_transform is not None:
+            target = self.target_transform(target)
+
+        input_dict = {
+            'inputs': img,
+            'labels': target,
+            'indices': index
+        }
+        return input_dict
+
 

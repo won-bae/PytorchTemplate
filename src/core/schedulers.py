@@ -53,7 +53,3 @@ class CustomScheduler(_LRScheduler):
     def get_lr(self):
         return [self.lr]
 
-    @property
-    def get_lr(self):
-        return self.get_lr()[0]
-
