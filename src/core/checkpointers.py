@@ -56,7 +56,7 @@ class CustomCheckpointer(object):
             torch.save(model_params, best_checkpoint_path)
 
             # Update the checkpoint record
-            best_checkpoint_info = {'epoch': epoch, 'num_steps': num_steps}
+            best_checkpoint_info = {"epoch": epoch, "num_steps": num_steps}
             best_checkpoint_info.update(eval_metrics)
             self._record_best_checkpoint(best_checkpoint_info)
 

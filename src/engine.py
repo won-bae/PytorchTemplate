@@ -11,13 +11,12 @@ from src.builders import model_builder, dataloader_builder, checkpointer_builder
 
 class BaseEngine(object):
 
-    def __init__(self, config_path, logger, save_dir):
+    def __init__(self, config, logger, save_dir):
         # Assign a logger and save dir
         self.logger = logger
         self.save_dir = save_dir
 
         # Load configurations
-        config = util.load_config(config_path)
         self.model_config = config['model']
         self.train_config = config['train']
         self.eval_config = config['eval']
@@ -49,8 +48,8 @@ class BaseEngine(object):
 
 class Engine(BaseEngine):
 
-    def __init__(self, config_path, logger, save_dir):
-        super(Engine, self).__init__(config_path, logger, save_dir)
+    def __init__(self, config, logger, save_dir):
+        super(Engine, self).__init__(config, logger, save_dir)
 
     def _build(self, mode='train'):
         # Build a dataloader
